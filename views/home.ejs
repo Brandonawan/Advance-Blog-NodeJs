@@ -2,12 +2,18 @@
 <h1>Home</h1>
 <p><%= StartingContent %> </p>
 
-<% posts.forEach(function(post) { %>
-    <h1><%= post.title%> </h1>
+
+<% posts.reverse().forEach(function(post) { %>
+    <h1><%= post.title %></h1>
     <p>
-        <%= post.message.substring(0, 100) + "..." %>
-        <a href="/post/:<%= post.title %>">Read More</a>
+        <%= post.content && post.content.length >= 100 ? post.content.substring(0, 100) + "..." : post.content %>
+        <a href="/post/<%= post.title %>">Read More</a>
     </p>
+    <form action="/delete/<%= post._id %>" method="POST">
+        <button>Delete</button>
+    </form>
+    <p>Posted on <%= post.createdAt %></p>
+    <p><%= post.updatedAt %></p>
 <% }) %>
 
 <%- include('partials/footer.ejs'); -%>	
