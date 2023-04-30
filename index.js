@@ -111,3 +111,32 @@ query.exec().then((users) => {
 //       });
     
 // });
+
+
+app.post("/register", async (req, res) => {
+
+    const { email, password } = req.body;
+    let userExists = await User.findOne({ email });
+    if (userExists) {
+      res.status(401).json({ message: "Email is already in use." });
+      return;
+    }
+    // Define salt rounds
+    const saltRounds = 10;
+    bcrypt.hash(password, saltRounds, (err, hash) => {
+      if (err) throw new Error("Internal Server Error");
+    const newUser = new User({
+      email, 
+      password: hash,
+    });
+
+    newUser.save().then(() => {
+      res.json({ message: "User created successfully", newUser });
+      res.render('compose');
+    }).catch((err) => {
+      console.log(err);
+      res.status(404).render('error', {status: '404', message: 'An error occurred while registering user' });
+      
+    });
+  });
+});

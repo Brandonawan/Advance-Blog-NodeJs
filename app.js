@@ -5,16 +5,20 @@ const ejs = require("ejs");
 const _ = require("lodash");
 const moongose = require('mongoose');
 const moment = require('moment');
-const encrypt = require('mongoose-encryption');
+// const encrypt = require('mongoose-encryption');
+const bcrypt = require('bcrypt');
+// const md5 = require('md5');
 const app = express();
+
+const saltRounds = 10;
 
 app.use(bodyParser.urlencoded({extended: true}));
 app.use(express.static("public"));
 
 // Set EJS as templating engine
-app.set('view engine', 'ejs');
+app.set('view engine', 'ejs'); 
 
-moongose.connect('mongodb://localhost:27017/blogDB', {useNewUrlParser: true, useUnifiedTopology: true});
+moongose.connect(process.env.MONGODB_URI, {useNewUrlParser: true, useUnifiedTopology: true});
 
 const homeStartingContent = "Lacus vel facilisis volutpat est velit egestas dui id ornare. Semper auctor neque vitae tempus quam. Sit amet cursus sit amet dictum sit amet justo. Viverra tellus in hac habitasse. Imperdiet proin fermentum leo vel orci porta. Donec ultrices tincidunt arcu non sodales neque sodales ut. Mattis molestie a iaculis at erat pellentesque adipiscing. Magnis dis parturient montes nascetur ridiculus mus mauris vitae ultricies. Adipiscing elit ut aliquam purus sit amet luctus venenatis lectus. Ultrices vitae auctor eu augue ut lectus arcu bibendum at. Odio euismod lacinia at quis risus sed vulputate odio ut. Cursus mattis molestie a iaculis at erat pellentesque adipiscing.";
 const aboutContent = "Hac habitasse platea dictumst vestibulum rhoncus est pellentesque. Dictumst vestibulum rhoncus est pellentesque elit ullamcorper. Non diam phasellus vestibulum lorem sed. Platea dictumst quisque sagittis purus sit. Egestas sed sed risus pretium quam vulputate dignissim suspendisse. Mauris in aliquam sem fringilla. Semper risus in hendrerit gravida rutrum quisque non tellus orci. Amet massa vitae tortor condimentum lacinia quis vel eros. Enim ut tellus elementum sagittis vitae. Mauris ultrices eros in cursus turpis massa tincidunt dui.";
@@ -43,9 +47,10 @@ const userSchema = new moongose.Schema({
   }
 });
 
+
 // Encrypt userSchema
-var secret = process.env.secret;
-userSchema.plugin(encrypt, { secret: secret, encryptedFields: ['password'] });
+// var secret = process.env.secret;
+// userSchema.plugin(encrypt, { secret: secret, encryptedFields: ['password'] });
 
 const Post = moongose.model("Post", postSchema);
 const User = moongose.model("User", userSchema);
@@ -82,18 +87,21 @@ app.get("/register", function(req, res){
 });
 
 app.post("/register", function(req, res){
-  const newUser = new User({
-    email: req.body.username,
-    password: req.body.password
-  });
 
-  newUser.save().then((user) => {
-    console.log(user);
-    res.render('compose');
-  }).catch((err) => {
-    console.log(err);
-    res.status(404).render('error', {status: '404', message: 'An error occurred while registering user' });
-    
+  bcrypt.hash(req.body.password, saltRounds, function(err, hash) {
+    const newUser = new User({
+      email: req.body.username,
+      password: hash
+    });
+
+    newUser.save().then((user) => {
+      console.log(user);
+      res.render('compose');
+    }).catch((err) => {
+      console.log(err);
+      res.status(404).render('error', {status: '404', message: 'An error occurred while registering user' });
+      
+    });
   });
 });
 
@@ -102,8 +110,13 @@ app.post('/login', async (req, res) => {
 
   try {
     const foundUser = await User.findOne({ email: username });
-    if (foundUser && foundUser.password === password) {
-      res.render('compose');
+    if (foundUser) {
+      const match = await bcrypt.compare(password, foundUser.password);
+      if (match) {
+        res.render('compose');
+      } else {
+        res.send('Invalid username or password');
+      }
     } else {
       res.send('Invalid username or password');
     }
@@ -112,6 +125,7 @@ app.post('/login', async (req, res) => {
     res.status(500).render('error', {status: '505', message: 'An error occurred while logging in' });
   }
 });
+
 
 
 app.get("/about", function(req, res){
