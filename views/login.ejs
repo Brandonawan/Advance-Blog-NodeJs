@@ -12,12 +12,17 @@
           <!-- Makes POST request to /login route -->
           <form action="/login" method="POST">
             <div class="form-group">
+              <% if(message) {%>
+                <div class="alert alert-primary" role="alert">
+                  <%= message %>
+                </div>
+                <% } %>
               <label for="email">Email</label>
-              <input type="email" class="form-control" name="username">
+              <input type="email" class="form-control" name="username" autocomplete="username" required autofocus>
             </div>
             <div class="form-group">
               <label for="password">Password</label>
-              <input type="password" class="form-control" name="password">
+              <input type="password" class="form-control" name="password" autocomplete="password" required>
             </div>
             <button type="submit" class="btn btn-dark">Login</button>
           </form>
