@@ -32,57 +32,12 @@ const homeStartingContent = "Lacus vel facilisis volutpat est velit egestas dui 
 const aboutContent = "Hac habitasse platea dictumst vestibulum rhoncus est pellentesque. Dictumst vestibulum rhoncus est pellentesque elit ullamcorper. Non diam phasellus vestibulum lorem sed. Platea dictumst quisque sagittis purus sit. Egestas sed sed risus pretium quam vulputate dignissim suspendisse. Mauris in aliquam sem fringilla. Semper risus in hendrerit gravida rutrum quisque non tellus orci. Amet massa vitae tortor condimentum lacinia quis vel eros. Enim ut tellus elementum sagittis vitae. Mauris ultrices eros in cursus turpis massa tincidunt dui.";
 const contactContent = "Scelerisque eleifend donec pretium vulputate sapien. Rhoncus urna neque viverra justo nec ultrices. Arcu dui vivamus arcu felis bibendum. Consectetur adipiscing elit duis tristique. Risus viverra adipiscing at in tellus integer feugiat. Sapien nec sagittis aliquam malesuada bibendum arcu vitae. Consequat interdum varius sit amet mattis. Iaculis nunc sed augue lacus. Interdum posuere lorem ipsum dolor sit amet consectetur adipiscing elit. Pulvinar elementum integer enim neque. Ultrices gravida dictum fusce ut placerat orci nulla. Mauris in aliquam sem fringilla ut morbi tincidunt. Tortor posuere ac ut consequat semper viverra nam libero.";
 
-// const postSchema = new moongose.Schema({
-//   title: {
-//     type: String,
-//     required: true
-//   },
-//   content: {
-//     type: String,
-//     required: true
-//   },
-//   createdAt: { type: Date, default: Date.now }
-// });
-
-// const userSchema = new moongose.Schema({
-//   email: {
-//     type: String,
-//     required: true
-//   },
-//   password: {
-//     type: String,
-//     required: true
-//   }
-// });
-
-const userSchema = new moongose.Schema({
-  email: {
-    type: String,
-    required: true,
-    unique: true
-  },
-  password: {
-    type: String,
-    required: true
-  },
-  role: {
-    type: String,
-    enum: ['admin', 'user'],
-    default: 'user'
-  }
-});
-
-
 // Encrypt userSchema
 // var secret = process.env.secret;
 // userSchema.plugin(encrypt, { secret: secret, encryptedFields: ['password'] });
 
-const Post = moongose.model("Post", postSchema);
-const User = moongose.model("User", userSchema);
-
-// passport.use(User.createStrategy());
-// passport.serializeUser(User.serializeUser());
-// passport.deserializeUser(User.deserializeUser());
+const Post = require("./models/post")
+const User = require("./models/user")
 
 app.get('/', async (req, res) => {
   try {
@@ -158,8 +113,6 @@ app.post('/login', async (req, res) => {
   }
 });
 
-
-
 app.get("/about", function(req, res){
 
   res.render('about', {aboutContent:aboutContent});
@@ -189,6 +142,38 @@ app.get('/post/:_id', async function(req, res){
         console.log(err);
         res.status(404).render('error', {status: '404', message: 'The post you are looking for was not found' });
     }
+});
+
+// update post
+app.get("/post/:_id/edit", async (req, res) => {
+  try {
+    const requested_post_id = req.params._id;
+    const post = await Post.findOne({ _id: requested_post_id });
+    if (!post) {
+      throw new Error("Post not found");
+    }
+    res.render("edit", { post });
+  } catch (error) {
+    console.log(error);
+    res.status(500).send("Internal server error");
+  }
+});
+
+// POST route to handle the update operation
+app.post("/post/:_id/edit", async (req, res) => {
+  try {
+    const filter = { _id: req.params._id };
+    const update = { title: req.body.title, content: req.body.content };
+    const post = await Post.findOneAndUpdate(filter, update, { new: true });
+    if (post) {
+      res.redirect("/"); // Redirect to the articles list
+    } else {
+      res.status(404).send("Post not found");
+    }
+  } catch (error) {
+    console.log(error);
+    res.status(500).send("Internal server error");
+  }
 });
 
 // Delete a post using the post id via the button on the home page

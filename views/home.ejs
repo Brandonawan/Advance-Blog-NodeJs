@@ -12,6 +12,9 @@
     <form action="/delete/<%= post._id %>" method="POST">
         <button>Delete</button>
     </form>
+    <br />
+    <a href="/post/<%= post._id %>/edit"><button>Edit</button></a>
+
     <p>Posted on <%= post.createdAt %></p>
     <p><%= post.updatedAt %></p>
 <% }) %>
