@@ -2,6 +2,10 @@
 <h1>Home</h1>
 <p><%= StartingContent %> </p>
 
+<form>
+    <input id="search" type="text" placeholder="search post" />
+    <button id="button" type="button">Search</button>
+</form>
 
 <% posts.reverse().forEach(function(post) { %>
     <h1><%= post.title %></h1>
