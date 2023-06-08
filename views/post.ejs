@@ -1,5 +1,14 @@
 <%- include('partials/header.ejs'); -%>
-<h1><%= title %> </h1>
-<p><%= content %> </p>
+    <h1>Blog Post</h1>
+    <h2><%= post.title %></h2>
+    <p><%= post.content %></p>
+    <p>Posted by <%= post.author.email %></p>
+    <% if (user && post.author._id.toString() === user._id.toString()) { %>
+      <form action="/delete/<%= post._id %>" method="POST">
+        <button>Delete</button>
+      </form>
+    <% } %>
+    <hr>
+    <a href="/">Back to All Posts</a>
 
 <%- include('partials/footer.ejs'); -%>	

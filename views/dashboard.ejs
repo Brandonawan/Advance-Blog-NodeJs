@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>User Dashboard</title>
+    <!-- Include your CSS and JavaScript files here -->
+</head>
+<%- include('partials/header.ejs'); -%>
+<h1>Welcome, <%= user %>!</h1>
+
+<h2>Your Blogs</h2>
+
+<% if (posts.length === 0) { %>
+    <p>No post yet.</p>
+<% } else { %>
+    <% posts.forEach(function(post) { %>
+        <div class="blog">
+            <h3><%= post.title %></h3>
+            <p><%= post.content %></p>
+            <p>Published on <%= post.createdAt.toDateString() %></p>
+        </div>
+    <% }) %>
+<% } %>
+
+<a href="/compose">Create a new blog</a>
+
+<!-- Include any other content or functionality specific to the user dashboard -->
+<%- include('partials/footer.ejs'); -%>

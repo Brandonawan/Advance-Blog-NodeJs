@@ -10,8 +10,7 @@ const moment = require('moment');
 const bcrypt = require('bcrypt');
 // const md5 = require('md5');
 const session = require('express-session')
-const passport = require('passport')
-const passportLocalMongoose = require('passport-local-mongoose')
+var cookieParser = require('cookie-parser')
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -24,6 +23,17 @@ app.use(express.static("public"));
 
 // Set EJS as templating engine
 app.set('view engine', 'ejs'); 
+
+app.use(express.json());
+app.use(cookieParser())
+app.use(session({
+  secret: 'keyboard cat',
+  resave: true,
+  saveUninitialized: true,
+  cookie: { maxAge: 6000000 }
+}))
+// Use the session middleware
+// app.use(session({ secret: 'keyboard cat', cookie: { maxAge: 60000 }}))
 
 
 moongose.connect(process.env.MONGODB_URI, {useNewUrlParser: true, useUnifiedTopology: true});
@@ -39,38 +49,37 @@ const contactContent = "Scelerisque eleifend donec pretium vulputate sapien. Rho
 const Post = require("./models/post")
 const User = require("./models/user")
 
-app.get('/', async (req, res) => {
+// Authentication middleware
+const requireAuth = (req, res, next) => {
+  if (req.session && req.session.user) {
+    // User is authenticated, proceed to the next middleware or route handler
+    next();
+  } else {
+    // User is not authenticated, redirect to login page or send an error response
+    res.redirect('/login');
+  }
+};
+
+app.get('/', requireAuth, async (req, res) => {
   try {
-    const posts = await Post.find({});
-    return res.render('home', {StartingContent: homeStartingContent, posts: posts});
+    const posts = await Post.find().populate('author');
+    res.render('home', { homeStartingContent: homeStartingContent, posts, user: req.session.user });
   } catch (err) {
     console.error(err);
     return res.render('error', {message: 'An error occurred while retrieving posts'});
   }
 });
 
-app.post("/compose", async (req, res) => {
-  try {
-    await Post.insertMany([{ title: req.body.title, content: req.body.content }]);
-    console.log("Post added successfully");
-    res.redirect("/");
-  } catch (error) {
-    console.log(error);
-    res.status(500).send("Error adding post");
-  }
-});
-
 
 app.get("/login", function(req, res){
   
-    res.render('login', {message: ''});
+    res.render('login', {message: '', user: req.session.user});
 });
 
 app.get("/register", function(req, res){
-  
-  res.render('register');
-});
 
+  res.render('register', { user: req.session.user });
+});
 
 app.post("/register", function(req, res){
 
@@ -82,7 +91,9 @@ app.post("/register", function(req, res){
 
     newUser.save().then((user) => {
       console.log(user);
-      res.render('compose');
+      req.session.user = user; // Store user in session
+      // res.render('home', {user: user});
+      res.redirect('dashboard', {user: user});
     }).catch((err) => {
       console.log(err);
       res.status(404).render('error', {status: '404', message: 'An error occurred while registering user' });
@@ -90,6 +101,47 @@ app.post("/register", function(req, res){
     });
   });
 });
+
+
+app.get('/dashboard', requireAuth, async (req, res) => {
+  try {
+    console.log(req.session);
+    const userId = req.session.user._id;
+    const posts = await Post.find({ author: userId }).populate('author');
+    res.render('dashboard', { posts, user: req.session.user });
+  } catch (error) {
+    console.log(error);
+    res.status(500).send('Error retrieving user posts');
+  }
+});
+
+// app.post('/register', async (req, res) => {
+//   try {
+//     const { email, password } = req.body;
+
+//     // Check if a user with the same email already exists
+//     const existingUser = await User.findOne({ email });
+//     if (existingUser) {
+//       return res.send('User with this email already exists');
+//     }
+
+//     const hashedPassword = await bcrypt.hash(password, 10);
+
+//     const user = new User({
+//       email,
+//       password: hashedPassword
+//     });
+
+//     await user.save();
+
+//     req.session.user = user; // Store user in session
+
+//     res.redirect('/dashboard');
+//   } catch (error) {
+//     console.error(error);
+//     res.send('Error registering user');
+//   }
+// });
 
 app.post('/login', async (req, res) => {
   const { username, password } = req.body;
@@ -99,7 +151,13 @@ app.post('/login', async (req, res) => {
     if (foundUser) {
       const match = await bcrypt.compare(password, foundUser.password);
       if (match) {
-        res.render('compose');
+        // Set the user in the session.
+        req.session.user = foundUser.email;
+        console.log(req.session.user);
+        // res.redirect('/dashboard' , {user: req.session.user});
+        const userId = req.session.user._id;
+        const posts = await Post.find({ author: userId }).populate('author');
+        res.render('dashboard', { posts, user: req.session.user });
       } else {
         res.send('Invalid username or password');
       }
@@ -113,34 +171,102 @@ app.post('/login', async (req, res) => {
   }
 });
 
+app.get('/compose', requireAuth, (req, res) => {
+  res.render('compose', { user: req.session.user });
+});
+
+// app.post("/compose", async (req, res) => {
+// try {
+//   const author = req.session.user._id;
+//   await Post.insertMany([{ title: req.body.title, content: req.body.content, author }]);
+//   console.log("Post added successfully");
+//   res.redirect("/");
+// } catch (error) {
+//   console.log(error);
+//   res.status(500).send("Error adding post");
+// }
+// });
+
+app.post("/compose", async (req, res) => {
+  try {
+    const currentUser = await User.findById(req.user.id);
+    if (!currentUser) {
+      return res.redirect('/login');
+    }
+
+    const newPost = {
+      title: req.body.title,
+      content: req.body.content,
+      author: currentUser._id
+    };
+
+    const post = await Post.create(newPost);
+
+    currentUser.posts.push(post);
+    await currentUser.save();
+
+    // return res.redirect(`/posts/${post._id}`);
+    res.redirect("/");
+  } catch (error) {
+    console.error(error);
+    res.redirect('/');
+  }
+});
+
+  
+// app.post("/compose", async (req, res) => {
+//   try {
+//     const author = req.session.user._id;
+//     const { title, content } = req.body;
+
+//     const post = new Post({
+//       title,
+//       content,
+//       author
+//     });
+
+//     await post.save();
+//     console.log("Post added successfully");
+//     res.redirect("/");
+//   } catch (error) {
+//     console.log(error);
+//     res.status(500).send("Error adding post");
+//   }
+// });
+
+
+
 app.get("/about", function(req, res){
 
-  res.render('about', {aboutContent:aboutContent});
+  res.render('about', {user: req.session.user, aboutContent:aboutContent});
 });
 
 app.get("/contact", function(req, res){
 
-  res.render('contact', {contactContent:contactContent});
+  res.render('contact', {user: req.session.user, contactContent:contactContent});
 });
 
-// app.get("/compose", function(req, res){
-
-//   res.render('compose');
-// });
+app.get('/logout', (req, res) => {
+  req.session.destroy((err) => {
+    if (err) {
+      console.log(err);
+    }
+    res.clearCookie('connect.sid')
+    res.redirect('/');
+  });
+});
 
     
 app.get('/post/:_id', async function(req, res){
   // const requested_post_id = _.lowerCase(req.params.post_id);
-    const requested_post_id = req.params._id;
-    console.log(requested_post_id);
-
+    const postId = req.params.id;
     try {
-        const post = await Post.findOne({ title: requested_post_id });
-        if (!post) throw new Error('Post not found');
-        res.render('post', { title: post.title, content: post.content });
+      const post = await Post.findById(postId).populate('author');
+        // if (!post) throw new Error('Post not found');
+        res.render('post', { post, user: req.session.user });
     } catch (err) {
         console.log(err);
-        res.status(404).render('error', {status: '404', message: 'The post you are looking for was not found' });
+        res.status(500).render('error', {status: '500', message: 'Error retrieving post' });
     }
 });
 
@@ -178,8 +304,15 @@ app.post("/post/:_id/edit", async (req, res) => {
 
 // Delete a post using the post id via the button on the home page
 app.post('/delete/:id', async (req, res) => {
-  await Post.deleteOne({_id: req.params.id})
-  return res.redirect('/')
+  try {
+    const postId = req.params.id;
+    const userId = req.session.user._id;
+    await Post.deleteOne({ _id: postId, author: userId });
+    res.redirect('/');
+  } catch (error) {
+    console.log(error);
+    res.status(500).send('Error deleting post');
+  }
 });
 
                  // Below are the rest api endpoints targetting all articles...
@@ -215,7 +348,7 @@ app.route("/articles")
   })
 
 
-                // Below are the rest api endpoints targetting a article...
+                // Below are the rest api endpoints targetting a single article...
 app.route("/articles/:_id")
   .get(async function (req, res) {
     try {

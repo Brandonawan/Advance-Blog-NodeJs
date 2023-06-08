@@ -1,26 +1,40 @@
 <%- include('partials/header.ejs'); -%>
-<h1>Home</h1>
-<p><%= StartingContent %> </p>
+<body>
+    <h1>Welcome to the Blog Home</h1>
+    <% if (user) { %>
+      <p>Logged in as <%= user %></p>
+      <a href="/compose">Create A Post</a>
+      <a href="/dashboard">My Posts</a>
+    <% } else { %>
+      <a href="/login">Login</a>
+    <% } %>
+    <hr>
 
-<form>
-    <input id="search" type="text" placeholder="search post" />
-    <button id="button" type="button">Search</button>
-</form>
-
+    <p><%= homeStartingContent %> </p>
+    <hr>
+<% if (posts.length === 0) { %>
+    <h1>No posts found</h1>
+<% } %>
 <% posts.reverse().forEach(function(post) { %>
     <h1><%= post.title %></h1>
     <p>
         <%= post.content && post.content.length >= 100 ? post.content.substring(0, 100) + "..." : post.content %>
         <a href="/post/<%= post.title %>">Read More</a>
     </p>
-    <form action="/delete/<%= post._id %>" method="POST">
-        <button>Delete</button>
-    </form>
-    <br />
-    <a href="/post/<%= post._id %>/edit"><button>Edit</button></a>
+    <p>Posted by <%= post.author.email %> on <%= post.createdAt.toLocaleDateString() %></p>
+    
+    <% if (user && post.author._id.toString() === user._id.toString()) { %>
+        <form action="/delete/<%= post._id %>" method="POST">
+          <button>Delete</button>
+        </form>
+        <form action="/edit/<%= post._id %>" method="GET">
+          <button>Edit</button>
+        </form>
+      <% } %>
+        <br />
+        <hr style="box-shadow: 0 4px 7px rgba(0, 0, 0, 0.2);" />
 
-    <p>Posted on <%= post.createdAt %></p>
-    <p><%= post.updatedAt %></p>
 <% }) %>
+
 
 <%- include('partials/footer.ejs'); -%>	
